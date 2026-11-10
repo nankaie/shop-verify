@@ -79,6 +79,7 @@ tbody tr:hover { background: #f8f9fa; }
           <thead>
             <tr>
               <th>门店ID</th>
+              <th>公司ID(PID)</th>
               <th>商户ID</th>
               <th>法人姓名</th>
               <th>营业执照号</th>
@@ -201,11 +202,11 @@ let currentRecords = [];
 
 function downloadCSV() {
   if (currentRecords.length === 0) return;
-  const headers = ['门店ID','商户ID','公司ID','法人姓名','营业执照号','法人核身方式','开店人核身方式','核身状态','核身时间','首次提交','最近提交','采集来源'];
+  const headers = ['门店ID','公司ID(PID)','商户ID','法人姓名','营业执照号','法人核身方式','开店人核身方式','核身状态','核身时间','首次提交','最近提交','采集来源'];
   const rows = currentRecords.map(r => [
     r.shop_id || '',
-    r.merchant_id || '',
     r.com_id || '',
+    r.merchant_id || '',
     r.legal_person_name || '',
     r.business_license_no || '',
     r.legal_verification_method || '',
@@ -304,6 +305,7 @@ function renderTable(records) {
     const cmTag = cm === 'FACE' ? 'tag-face' : cm === 'PHONE' ? 'tag-phone' : cm === 'UNKNOWN' ? 'tag-unknown' : 'tag-null';
     return `<tr>
       <td style="font-family:monospace;font-size:12px;">${r.shop_id}</td>
+      <td style="font-family:monospace;">${r.com_id}</td>
       <td style="font-family:monospace;">${r.merchant_id}</td>
       <td>${r.legal_person_name || '-'}</td>
       <td style="font-family:monospace;font-size:12px;">${r.business_license_no || '-'}</td>
