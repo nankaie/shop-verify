@@ -70,7 +70,10 @@ tbody tr:hover { background: #f8f9fa; }
       <div class="chart-box"><h3>开店人核身方式分布</h3><canvas id="creatorChart"></canvas></div>
     </div>
     <div class="table-box">
-      <h3>门店核身明细</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;">门店核身明细</h3>
+        <button onclick="downloadCSV()" style="padding:6px 16px;background:#0A2540;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;">下载明细</button>
+      </div>
       <div style="overflow-x:auto;">
         <table>
           <thead>
@@ -194,6 +197,32 @@ const ALL_DATA = {
 };
 
 let legalChartInst = null, creatorChartInst = null;
+let currentRecords = [];
+
+function downloadCSV() {
+  if (currentRecords.length === 0) return;
+  const headers = ['门店ID','商户ID','公司ID','法人姓名','营业执照号','法人核身方式','开店人核身方式','核身状态','核身时间','首次提交','最近提交','采集来源'];
+  const rows = currentRecords.map(r => [
+    r.shop_id || '',
+    r.merchant_id || '',
+    r.com_id || '',
+    r.legal_person_name || '',
+    r.business_license_no || '',
+    r.legal_verification_method || '',
+    r.shop_creator_verification_method || '',
+    r.verified_at ? '已核身' : '未核身',
+    r.verified_at || '',
+    r.first_submit_at || '',
+    r.last_submit_at || '',
+    r.record_source || ''
+  ]);
+  const csv = '\uFEFF' + [headers, ...rows].map(row => row.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = '门店核身明细_' + document.getElementById('pidInput').value.trim() + '.csv';
+  link.click();
+}
 
 document.getElementById('pidInput').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') searchPID();
@@ -211,6 +240,7 @@ function searchPID() {
   }
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('content').style.display = 'block';
+  currentRecords = records;
   renderCards(records);
   renderCharts(records);
   renderTable(records);
