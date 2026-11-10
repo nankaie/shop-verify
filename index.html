@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>门店核身查询看板</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f2f5; color: #1a1a2e; }
+.header { background: #0A2540; color: #fff; padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; }
+.header h1 { font-size: 20px; font-weight: 600; letter-spacing: 1px; }
+.header .subtitle { font-size: 13px; color: rgba(255,255,255,0.6); margin-top: 2px; }
+.search-bar { background: #fff; padding: 20px 32px; border-bottom: 1px solid #e8e8e8; display: flex; align-items: center; gap: 12px; }
+.search-bar input { width: 360px; padding: 10px 16px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; outline: none; transition: border-color .2s; }
+.search-bar input:focus { border-color: #0A2540; }
+.search-bar button { padding: 10px 24px; background: #0A2540; color: #fff; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; transition: background .2s; }
+.search-bar button:hover { background: #163a5f; }
+.search-bar .hint { font-size: 12px; color: #999; margin-left: 8px; }
+.container { padding: 24px 32px; }
+.cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.card { background: #fff; border-radius: 10px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.card .label { font-size: 13px; color: #888; margin-bottom: 8px; }
+.card .value { font-size: 28px; font-weight: 700; color: #0A2540; }
+.card .value.green { color: #27ae60; }
+.card .value.orange { color: #e67e22; }
+.card .value.red { color: #e74c3c; }
+.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.chart-box { background: #fff; border-radius: 10px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.chart-box h3 { font-size: 14px; color: #555; margin-bottom: 16px; font-weight: 500; }
+.chart-box canvas { max-height: 220px; }
+.table-box { background: #fff; border-radius: 10px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.table-box h3 { font-size: 14px; color: #555; margin-bottom: 16px; font-weight: 500; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th { background: #0A2540; color: #fff; padding: 10px 12px; text-align: left; font-weight: 500; white-space: nowrap; }
+tbody td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+tbody tr:hover { background: #f8f9fa; }
+.tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+.tag-face { background: #e8f5e9; color: #27ae60; }
+.tag-phone { background: #e3f2fd; color: #2980b9; }
+.tag-unknown { background: #fff3e0; color: #e67e22; }
+.tag-null { background: #f5f5f5; color: #999; }
+.tag-verified { background: #e8f5e9; color: #27ae60; }
+.tag-unverified { background: #fdecea; color: #e74c3c; }
+.empty-state { text-align: center; padding: 60px 20px; color: #999; font-size: 15px; }
+.footer { text-align: center; padding: 20px; color: #bbb; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>门店核身查询看板</h1>
+    <div class="subtitle">数据源：kbads.ods_amap_risk_shop_verification_record_df | 分区：20261109</div>
+  </div>
+</div>
+
+<div class="search-bar">
+  <input type="text" id="pidInput" placeholder="输入 PID（公司ID/com_id），如 2088041157135333" />
+  <button onclick="searchPID()">查询</button>
+  <span class="hint">按 Enter 快速查询</span>
+</div>
+
+<div class="container" id="dashboard">
+  <div class="empty-state" id="emptyState">请输入 PID 开始查询</div>
+  <div id="content" style="display:none;">
+    <div class="cards" id="cards"></div>
+    <div class="charts-row">
+      <div class="chart-box"><h3>法人核身方式分布</h3><canvas id="legalChart"></canvas></div>
+      <div class="chart-box"><h3>开店人核身方式分布</h3><canvas id="creatorChart"></canvas></div>
+    </div>
+    <div class="table-box">
+      <h3>门店核身明细</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>门店ID</th>
+              <th>商户ID</th>
+              <th>法人姓名</th>
+              <th>营业执照号</th>
+              <th>法人核身方式</th>
+              <th>开店人核身方式</th>
+              <th>核身状态</th>
+              <th>核身时间</th>
+              <th>首次提交</th>
+              <th>最近提交</th>
+              <th>采集来源</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">门店核身查询看板 | 数据分区 ds=20261109 | 核身有效条件：verified_at IS NOT NULL AND is_deleted=0</div>
+
+<script>
+const ALL_DATA = {
+  "2088041157135333": [
+    {
+      "shop_id": "2023060711077000000106474241|xiniu_xgc_bgc",
+      "merchant_id": "1088019905185605",
+      "com_id": "2088041157135333",
+      "subject_role": "LEGAL_PERSON",
+      "shop_creator_verification_method": null,
+      "legal_verification_method": "FACE",
+      "verified_at": "2026-07-13 17:10:11",
+      "is_deleted": 0,
+      "first_submit_at": "2026-07-13 17:10:33",
+      "last_submit_at": "2026-07-13 17:10:33",
+      "gmt_create": "2026-11-06 18:17:24",
+      "gmt_modified": "2026-11-06 18:17:24",
+      "business_license_no": "91430102MAKFBM1113",
+      "legal_person_name": "黄宣平",
+      "legal_person_id_type": 1,
+      "record_source": "DRAFT_SUBMIT"
+    },
+    {
+      "shop_id": "2020123100077000000013332069|xiniu_xgc_bgc",
+      "merchant_id": "1088019905185605",
+      "com_id": "2088041157135333",
+      "subject_role": "LEGAL_PERSON",
+      "shop_creator_verification_method": null,
+      "legal_verification_method": "FACE",
+      "verified_at": "2026-07-24 11:18:38",
+      "is_deleted": 0,
+      "first_submit_at": "2026-07-24 11:19:00",
+      "last_submit_at": "2026-07-24 11:19:00",
+      "gmt_create": "2026-11-06 18:17:25",
+      "gmt_modified": "2026-11-06 18:17:25",
+      "business_license_no": "91440605MAKHTGLM4B",
+      "legal_person_name": "林汝亮",
+      "legal_person_id_type": 1,
+      "record_source": "DRAFT_SUBMIT"
+    },
+    {
+      "shop_id": "2023071711077000000107165002|xiniu_xgc_bgc",
+      "merchant_id": "1088019905185605",
+      "com_id": "2088041157135333",
+      "subject_role": "LEGAL_PERSON",
+      "shop_creator_verification_method": "UNKNOWN",
+      "legal_verification_method": "PHONE",
+      "verified_at": "2026-07-23 17:38:31",
+      "is_deleted": 0,
+      "first_submit_at": "2026-07-23 17:38:33",
+      "last_submit_at": "2026-07-23 17:38:33",
+      "gmt_create": "2026-11-06 18:10:39",
+      "gmt_modified": "2026-11-06 18:10:39",
+      "business_license_no": "91441900MACLG1382D",
+      "legal_person_name": "周俊睿",
+      "legal_person_id_type": 1,
+      "record_source": "DRAFT_SUBMIT"
+    },
+    {
+      "shop_id": "2020123100077000000013329529|xiniu_xgc_bgc",
+      "merchant_id": "1088019905185605",
+      "com_id": "2088041157135333",
+      "subject_role": "LEGAL_PERSON",
+      "shop_creator_verification_method": null,
+      "legal_verification_method": "FACE",
+      "verified_at": "2026-07-07 16:19:46",
+      "is_deleted": 0,
+      "first_submit_at": "2026-07-07 16:20:39",
+      "last_submit_at": "2026-07-07 16:20:39",
+      "gmt_create": "2026-11-06 18:14:20",
+      "gmt_modified": "2026-11-06 18:14:20",
+      "business_license_no": "91310113MAKH5CEH7L",
+      "legal_person_name": "谭震华",
+      "legal_person_id_type": null,
+      "record_source": "DRAFT_SUBMIT"
+    },
+    {
+      "shop_id": "2020123100077000000013329527|xiniu_xgc_bgc",
+      "merchant_id": "1088019905185605",
+      "com_id": "2088041157135333",
+      "subject_role": "LEGAL_PERSON",
+      "shop_creator_verification_method": null,
+      "legal_verification_method": "FACE",
+      "verified_at": "2026-07-16 12:28:54",
+      "is_deleted": 0,
+      "first_submit_at": "2026-07-16 12:29:23",
+      "last_submit_at": "2026-07-16 12:29:23",
+      "gmt_create": "2026-11-06 18:02:14",
+      "gmt_modified": "2026-11-06 18:02:14",
+      "business_license_no": "91440300MAKJF45PXL",
+      "legal_person_name": "苏灿辉",
+      "legal_person_id_type": 1,
+      "record_source": "DRAFT_SUBMIT"
+    }
+  ]
+};
+
+let legalChartInst = null, creatorChartInst = null;
+
+document.getElementById('pidInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') searchPID();
+});
+
+function searchPID() {
+  const pid = document.getElementById('pidInput').value.trim();
+  if (!pid) return;
+  const records = ALL_DATA[pid];
+  if (!records || records.length === 0) {
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('emptyState').textContent = '未找到 PID=' + pid + ' 的核身记录（当前仅内置示例数据，新PID需通过ODPS查询后更新）';
+    document.getElementById('content').style.display = 'none';
+    return;
+  }
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('content').style.display = 'block';
+  renderCards(records);
+  renderCharts(records);
+  renderTable(records);
+}
+
+function renderCards(records) {
+  const total = records.length;
+  const verified = records.filter(r => r.verified_at).length;
+  const unverified = total - verified;
+  const faceCount = records.filter(r => r.legal_verification_method === 'FACE').length;
+  const phoneCount = records.filter(r => r.legal_verification_method === 'PHONE').length;
+
+  document.getElementById('cards').innerHTML = `
+    <div class="card"><div class="label">门店总数</div><div class="value">${total}</div></div>
+    <div class="card"><div class="label">核身成功</div><div class="value green">${verified}</div></div>
+    <div class="card"><div class="label">未核身</div><div class="value ${unverified > 0 ? 'red' : ''}">${unverified}</div></div>
+    <div class="card"><div class="label">FACE / PHONE</div><div class="value" style="font-size:20px;">${faceCount} / ${phoneCount}</div></div>
+  `;
+}
+
+function renderCharts(records) {
+  const legalMethods = {};
+  const creatorMethods = {};
+  records.forEach(r => {
+    const lm = r.legal_verification_method || '未核身';
+    legalMethods[lm] = (legalMethods[lm] || 0) + 1;
+    const cm = r.shop_creator_verification_method || '无记录';
+    creatorMethods[cm] = (creatorMethods[cm] || 0) + 1;
+  });
+
+  const colors = { 'FACE': '#27ae60', 'PHONE': '#2980b9', 'UNKNOWN': '#e67e22', '未核身': '#e74c3c', '无记录': '#bdc3c7' };
+
+  if (legalChartInst) legalChartInst.destroy();
+  legalChartInst = new Chart(document.getElementById('legalChart'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(legalMethods),
+      datasets: [{ data: Object.values(legalMethods), backgroundColor: Object.keys(legalMethods).map(k => colors[k] || '#95a5a6'), borderWidth: 0 }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true } } } }
+  });
+
+  if (creatorChartInst) creatorChartInst.destroy();
+  creatorChartInst = new Chart(document.getElementById('creatorChart'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(creatorMethods),
+      datasets: [{ data: Object.values(creatorMethods), backgroundColor: Object.keys(creatorMethods).map(k => colors[k] || '#95a5a6'), borderWidth: 0 }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true } } } }
+  });
+}
+
+function renderTable(records) {
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = records.map(r => {
+    const lm = r.legal_verification_method || '-';
+    const cm = r.shop_creator_verification_method || '-';
+    const verified = !!r.verified_at;
+    const lmTag = lm === 'FACE' ? 'tag-face' : lm === 'PHONE' ? 'tag-phone' : lm === 'UNKNOWN' ? 'tag-unknown' : 'tag-null';
+    const cmTag = cm === 'FACE' ? 'tag-face' : cm === 'PHONE' ? 'tag-phone' : cm === 'UNKNOWN' ? 'tag-unknown' : 'tag-null';
+    return `<tr>
+      <td style="font-family:monospace;font-size:12px;">${r.shop_id}</td>
+      <td style="font-family:monospace;">${r.merchant_id}</td>
+      <td>${r.legal_person_name || '-'}</td>
+      <td style="font-family:monospace;font-size:12px;">${r.business_license_no || '-'}</td>
+      <td><span class="tag ${lmTag}">${lm}</span></td>
+      <td><span class="tag ${cmTag}">${cm}</span></td>
+      <td><span class="tag ${verified ? 'tag-verified' : 'tag-unverified'}">${verified ? '已核身' : '未核身'}</span></td>
+      <td>${r.verified_at || '-'}</td>
+      <td>${r.first_submit_at || '-'}</td>
+      <td>${r.last_submit_at || '-'}</td>
+      <td>${r.record_source || '-'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Auto-load default PID
+document.getElementById('pidInput').value = '2088041157135333';
+searchPID();
+</script>
+</body>
+</html>
